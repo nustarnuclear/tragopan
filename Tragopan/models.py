@@ -66,7 +66,7 @@ class MaterialComposition(BaseModel):
     weight_percent=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text="unit:percentage")
     
     class Meta:
-        db_table='MaterialComposition'
+        db_table='material_composition'
         order_with_respect_to='material'
         ordering=['material']
         unique_together=('material','element')
@@ -82,7 +82,7 @@ class MaterialAttribute(BaseModel):
     expansion_coefficient=models.DecimalField(max_digits=20, decimal_places=10,help_text='m_per_K',blank=True,null=True)
     code = models.CharField(max_length=10, blank=True)
     class Meta:
-        db_table='MaterialAttribute'
+        db_table='material_attribute'
         
     def __str__(self):
         return str(self.material)+"'s attribute"
@@ -94,9 +94,214 @@ class MaterialNuclide(BaseModel):
     weight_percent=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text="unit:percentage")
     
     class Meta:
-        db_table='MaterialNuclide'
+        db_table='material_nuclide'
     
     def __str__(self):
         return str(self.material)+' '+str(self.nuclide)
-            
+
+class Vendor(BaseModel):
+    TYPE_CHOICES=(
+        ('Designer','Designer'),
+        ('Manufacturer','Manufacturer'),
+        ('Material','Material'),
+    )
+    nameCH=models.CharField(max_length=40)
+    abbrCH=models.CharField(max_length=40)
+    nameEN=models.CharField(max_length=40)
+    abbrEN=models.CharField(max_length=40)
+    type=models.CharField(max_length=12, choices=TYPE_CHOICES,default='Designer')
+    
+    class Meta:
+        db_table='vendor'
+        
+    def __str__(self):
+        return self.abbrCH
+    
+#################################################
+#nuclear power plant basic information 
+#################################################
+
+class Plant(BaseModel):
+    nameCH=models.CharField(max_length=40)
+    abbrCH=models.CharField(max_length=40)
+    nameEN=models.CharField(max_length=40)
+    abbrEN=models.CharField(max_length=40)
+    
+    class Meta:
+        db_table='plant'
+        
+    def __str__(self):
+        return self.abbrCH   
+    
+class ReactorModel(BaseModel):
+    GENERATION_CHOICES = (
+        ('2', '2'),
+        ('2+', '2+'),
+        ('3', '3'),
+    )
+
+    TYPE_CHOICES = (
+        ('PWR', 'PWR'),
+        ('BWR', 'BWR'),
+    )
+
+    GEOMETRY_CHOICES = (
+        ('Cartesian', 'Cartesian'),
+        ('Hexagonal', 'Hexagonal'),
+    )
+    
+    SYMBOL_CHOICES = (
+        ('Number', 'Number'),
+        ('Letter', 'Letter'),
+    )
+
+
+    model = models.CharField(max_length=50)
+    generation = models.CharField(max_length=2, choices=GENERATION_CHOICES)
+    reactor_type = models.CharField(max_length=3, choices=TYPE_CHOICES)
+    geometry_type = models.CharField(max_length=9, choices=GEOMETRY_CHOICES)
+    row_symbol = models.CharField(max_length=6, choices=SYMBOL_CHOICES)
+    column_symbol = models.CharField(max_length=6, choices=SYMBOL_CHOICES)
+    num_loops = models.PositiveSmallIntegerField()
+    num_control_rod_mechanisms = models.PositiveSmallIntegerField()
+    core_equivalent_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    active_height= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    cold_state_assembly_pitch= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    hot_state_assembly_pitch = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    vendor = models.ForeignKey(Vendor)
+   
+    class Meta:
+        db_table = 'reactor_model'
+    
+    def __str__(self):
+        self.model     
+
+class ReactorPosition(BaseModel):
+    reactor_model=models.ForeignKey(ReactorModel)
+    row=models.PositiveSmallIntegerField()
+    column=models.PositiveSmallIntegerField()
+    
+    class Meta:
+        db_table='reactor_position'
+        
+    def __str__(self):
+        return 'R{}C{}'.format(self.row, self.column)
+
+class CoreBarrel(BaseModel):
+    reactor_model =models.OneToOneField(ReactorModel)
+    outer_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material = models.ForeignKey(Material)
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='core_barrel'
+        
+    def __str__(self):
+        return "{}'s core barrel".format(self.reactor_model)
+        
+class CoreUpperPlate(BaseModel):
+    TYPE_CHOICES=(
+        ('Upper','Upper'),
+        ('Lower','Lower'),
+    )
+    reactor_model=models.OneToOneField(ReactorModel)
+    type=models.CharField(max_length=5, choices=TYPE_CHOICES)
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:KG')
+    material = models.ForeignKey(Material)
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='core_upper_plate'
+    
+    def __str__(self):
+        return "{}'s core upper plate".format(self.reactor_model)
+    
+class CoreLowerPlate(BaseModel):
+    reactor_model=models.OneToOneField(ReactorModel)
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:KG')
+    material = models.ForeignKey(Material)
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='core_lower_plate'
+    
+    def __str__(self):
+        return "{}'s core lower plate".format(self.reactor_model)
+        
+    
+class ThermalShield(BaseModel):
+    reactor_model=models.ForeignKey(ReactorModel)
+    height =models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm') 
+    outer_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    angle=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0),MaxValueValidator(360)],help_text='unit:degree')
+    loc_height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    loc_theta=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0),MaxValueValidator(360)],help_text='unit:degree')
+    gap_to_barrel=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material = models.ForeignKey(Material)
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='thermal_shield'
+    
+    def __str__(self):
+        return "{}'s {} thermal shield".format(self.reactor_model, self.id)
+    
+class PressureVessel(BaseModel):
+    reactor_model=models.OneToOneField(ReactorModel)
+    outer_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    weld_thickness = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    base_material = models.ForeignKey(Material,related_name='pressure_vessel_base')
+    weld_material = models.ForeignKey(Material,related_name='pressure_vessel_weld')
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='pressure_vessel'
+    
+    def __str__(self):
+        return "{}'s pressure vessel".format(self.reactor_model)
+
+class PressureVesselInsulation(BaseModel):
+    reactor_model=models.OneToOneField(ReactorModel)
+    outer_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material = models.ForeignKey(Material)
+    vendor = models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='pressure_vessel_insulation'
+    
+    def __str__(self):
+        return "{}'s pressure vessel insulation".format(self.reactor_model)
+    
+class CoreBaffle(BaseModel):
+    reactor_model=models.OneToOneField(ReactorModel)
+    vendor = models.ForeignKey(Vendor)
+    gap_to_fuel=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material = models.ForeignKey(Material)
+    thickness= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm',blank=True,null=True)
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:KG',blank=True,null=True)
+    
+    class Meta:
+        db_table='core_baffle'
+    
+    def __str__(self):
+        return "{}'s core baffle".format(self.reactor_model)
+    
+class RipPlate(BaseModel):
+    core_baffle=models.OneToOneField(ReactorModel)
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    thickness=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    width= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm',blank=True,null=True)
+    material = models.ForeignKey(Material)
+    
+    class Meta:
+        db_table='rip_plate'
+    
+    def __str__(self):
+        return "{}'s rip plate".format(self.core_baffle)
+        
     

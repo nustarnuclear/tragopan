@@ -119,3 +119,65 @@ class MaterialAdmin(admin.ModelAdmin):
         return ()
 admin.site.register(Material, MaterialAdmin)
 
+class VendorAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    list_display=('nameEN','nameCH')
+    list_display_links=('nameEN','nameCH')
+admin.site.register(Vendor, VendorAdmin)
+
+#################################################
+#nuclear power plant basic information 
+#################################################
+
+class PlantAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    list_display=('nameEN','nameCH')
+    list_display_links=('nameEN','nameCH')
+admin.site.register(Plant, PlantAdmin)
+
+#the following inline tables are gonna describe a kind of reactor model
+class ReactorPositionInline(admin.TabularInline):
+    model=ReactorPosition
+    extra=121
+    exclude=('reference','remark')
+    
+class CoreBarrelInline(admin.TabularInline):
+    model=CoreBarrel
+    extra=1
+    exclude=('reference','remark')
+    
+class CoreUpperPlateInline(admin.TabularInline):
+    model=CoreUpperPlate
+    extra=1
+    exclude=('reference','remark')
+    
+class CoreLowerPlateInline(admin.TabularInline):
+    model=CoreLowerPlate
+    extra=1
+    exclude=('reference','remark')
+    
+class ThermalShieldInline(admin.TabularInline):
+    model=ThermalShield
+    extra=1
+    exclude=('reference','remark')
+
+class PressureVesselInline(admin.TabularInline):
+    model=PressureVessel
+    extra=1
+    exclude=('reference','remark')
+    
+class PressureVesselInsulationInline(admin.TabularInline):
+    model=PressureVesselInsulation
+    extra=1
+    exclude=('reference','remark')
+    
+class CoreBaffleInline(admin.TabularInline):
+    model=CoreBaffle
+    extra=1
+    exclude=('reference','remark')
+    
+class ReactorModelAdmin(admin.ModelAdmin):
+    inlines=[CoreBaffleInline,CoreUpperPlateInline,CoreLowerPlateInline,ThermalShieldInline,PressureVesselInline,PressureVesselInsulationInline,CoreBaffleInline,ReactorPositionInline]
+admin.site.register(ReactorModel,ReactorModelAdmin)
+    
+

@@ -134,6 +134,13 @@ class Plant(BaseModel):
         return self.abbrCH   
     
 class ReactorModel(BaseModel):
+    MODEL_CHOICES=(
+        ('QNPC2','QNPC2'),
+        ('QNPC1','QNPC1'),
+        ('M310','M310'),
+        ('CAP1000','CAP1000'),
+        ('AP1000','AP1000'),
+    )
     GENERATION_CHOICES = (
         ('2', '2'),
         ('2+', '2+'),
@@ -156,7 +163,7 @@ class ReactorModel(BaseModel):
     )
 
 
-    model = models.CharField(max_length=50)
+    model = models.CharField(max_length=50,choices=MODEL_CHOICES)
     generation = models.CharField(max_length=2, choices=GENERATION_CHOICES)
     reactor_type = models.CharField(max_length=3, choices=TYPE_CHOICES)
     geometry_type = models.CharField(max_length=9, choices=GEOMETRY_CHOICES)
@@ -166,26 +173,55 @@ class ReactorModel(BaseModel):
     num_control_rod_mechanisms = models.PositiveSmallIntegerField()
     core_equivalent_diameter = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     active_height= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
-    cold_state_assembly_pitch= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
-    hot_state_assembly_pitch = models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    cold_state_assembly_pitch= models.DecimalField(max_digits=7, decimal_places=4,validators=[MinValueValidator(0)],help_text='unit:cm')
+    hot_state_assembly_pitch = models.DecimalField(max_digits=7, decimal_places=4,validators=[MinValueValidator(0)],help_text='unit:cm')
     vendor = models.ForeignKey(Vendor)
+    
+    def limit_thermal_couple_position_choices(self):
+        return {'reactor_model': self.model}
+    
+    def limit_incore_instrument_position_choices(self):
+        return {'reactor_model': self.model}
+    
+    thermal_couple_position=models.ManyToManyField('ReactorPosition',related_name='thermal_couple_position',db_table='thermal_couple_map',blank=True,limit_choices_to=limit_thermal_couple_position_choices)
+    incore_instrument_position=models.ManyToManyField('ReactorPosition',related_name='incore_instrument_position',db_table='incore_instrument_map',blank=True,limit_choices_to=limit_incore_instrument_position_choices)
    
     class Meta:
         db_table = 'reactor_model'
     
     def __str__(self):
-        self.model     
+        return str(self.model)     
 
 class ReactorPosition(BaseModel):
-    reactor_model=models.ForeignKey(ReactorModel)
+    reactor_model=models.ForeignKey(ReactorModel,related_name='positions',related_query_name='position')
     row=models.PositiveSmallIntegerField()
     column=models.PositiveSmallIntegerField()
     
     class Meta:
         db_table='reactor_position'
+        unique_together=('reactor_model','row','column')
         
     def __str__(self):
-        return 'R{}C{}'.format(self.row, self.column)
+        rowSymbol=self.reactor_model.row_symbol
+        columnSymbol=self.reactor_model.column_symbol
+        #transform the number to letter
+        if rowSymbol=='Letter':
+            if self.row<=8:
+                rowRpr=chr(self.row+64)
+            else:
+                rowRpr=chr(self.row+65)
+        else:
+            rowRpr=str(self.row).zfill(2)
+        
+        if columnSymbol=='Letter':
+            if self.column<=8:
+                rowRpr=chr(self.column+64)
+            else:
+                rowRpr=chr(self.column+65)
+        else:
+            columnRpr=str(self.column).zfill(2)
+        
+        return '{} {}{}'.format(self.reactor_model,rowRpr,columnRpr)
 
 class CoreBarrel(BaseModel):
     reactor_model =models.OneToOneField(ReactorModel)
@@ -201,12 +237,7 @@ class CoreBarrel(BaseModel):
         return "{}'s core barrel".format(self.reactor_model)
         
 class CoreUpperPlate(BaseModel):
-    TYPE_CHOICES=(
-        ('Upper','Upper'),
-        ('Lower','Lower'),
-    )
     reactor_model=models.OneToOneField(ReactorModel)
-    type=models.CharField(max_length=5, choices=TYPE_CHOICES)
     weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:KG')
     material = models.ForeignKey(Material)
     vendor = models.ForeignKey(Vendor)
@@ -278,19 +309,19 @@ class PressureVesselInsulation(BaseModel):
     
 class CoreBaffle(BaseModel):
     reactor_model=models.OneToOneField(ReactorModel)
-    vendor = models.ForeignKey(Vendor)
     gap_to_fuel=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     material = models.ForeignKey(Material)
     thickness= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm',blank=True,null=True)
     weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:KG',blank=True,null=True)
-    
+    vendor = models.ForeignKey(Vendor)
     class Meta:
         db_table='core_baffle'
     
     def __str__(self):
         return "{}'s core baffle".format(self.reactor_model)
-    
+
+#rip plate table is associate with core baffle table    
 class RipPlate(BaseModel):
     core_baffle=models.OneToOneField(ReactorModel)
     height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
@@ -303,5 +334,9 @@ class RipPlate(BaseModel):
     
     def __str__(self):
         return "{}'s rip plate".format(self.core_baffle)
+
+
+    
+    
         
     

@@ -125,6 +125,11 @@ class VendorAdmin(admin.ModelAdmin):
     exclude=('remark',)
     list_display=('nameEN','nameCH','type')
     list_display_links=('nameEN','nameCH')
+    
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('nameCH','nameEN','abbrCH','abbrEN','type')
+        return ()
 admin.site.register(Vendor, VendorAdmin)
 
 #################################################
@@ -135,26 +140,41 @@ class PlantAdmin(admin.ModelAdmin):
     exclude=('remark',)
     list_display=('nameEN','nameCH')
     list_display_links=('nameEN','nameCH')
+    
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('nameCH','nameEN','abbrCH','abbrEN')
+        return ()
 admin.site.register(Plant, PlantAdmin)
 
 class ReactorPositionAdmin(admin.ModelAdmin):
     exclude=('remark',)
     search_fields=('=row','=column')
     list_filter=('reactor_model__model',)
-    list_display=('__str__','reactor_model')
     list_per_page=200
     ordering=('row','column')
+    
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('reactor_model','row','column')
+        return ()
 admin.site.register(ReactorPosition, ReactorPositionAdmin)
 
 #the following inline tables describe a kind of reactor model
 class ReactorPositionInline(admin.TabularInline):
     model=ReactorPosition
+    exclude=('remark',)
+    
     def get_extra(self, request, obj=None, **kwargs):
         extra = 121
         if obj:
             extra -= obj.positions.count()
         return extra
-    exclude=('remark',)
+    
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('row','column',)
+        return ()
 
 class CoreBarrelInline(admin.TabularInline):
     model=CoreBarrel
@@ -199,32 +219,41 @@ class CoreBaffleInline(admin.TabularInline):
 
 class ThermalCouplePositionInline(admin.TabularInline):
     model = ReactorModel.thermal_couple_position.through
+    verbose_name='thermal_couple_position'
+    verbose_name_plural='thermal couple position'
+    
     def get_extra(self, request, obj=None, **kwargs):
         extra =30
         if obj:
             extra -= obj.thermal_couple_position.count()
         return extra
-    verbose_name='thermal_couple_position'
-    verbose_name_plural='thermal couple position'
+    
 
 class IncoreInstrumentPositionInline(admin.TabularInline):
     model = ReactorModel.incore_instrument_position.through
+    verbose_name='incore_instrument_position'
+    verbose_name_plural='incore instrument position'
+    
     def get_extra(self, request, obj=None, **kwargs):
         extra =38
         if obj:
             extra -= obj.incore_instrument_position.count()
         return extra
-    verbose_name='incore_instrument_position'
-    verbose_name_plural='incore instrument position'
     
 class ReactorModelAdmin(admin.ModelAdmin):
     exclude=('remark','thermal_couple_position','incore_instrument_position')
-    #raw_id_fields=('thermal_couple_position','incore_instrument_position')
     inlines=[CoreBaffleInline,CoreUpperPlateInline,CoreLowerPlateInline,ThermalShieldInline,PressureVesselInline,PressureVesselInsulationInline,CoreBaffleInline,
              ThermalCouplePositionInline,IncoreInstrumentPositionInline,ReactorPositionInline]
-    
+    #raw_id_fields=('thermal_couple_position','incore_instrument_position')
     list_display=['model','generation','reactor_type','geometry_type','num_loops','num_control_rod_mechanisms',
                   'get_thermal_couple_num','get_incore_instrument_num','get_fuel_assembly_num']
+    
+    def get_formsets_with_inlines(self, request, obj=None):
+        for inline in self.get_inline_instances(request, obj):
+            if not request.user.is_superuser:
+                if isinstance(inline, ThermalCouplePositionInline) or isinstance(inline, IncoreInstrumentPositionInline):
+                    continue
+            yield inline.get_formset(request, obj), inline
     
     def get_thermal_couple_num(self,obj):
         num=obj.thermal_couple_position.count()
@@ -240,7 +269,68 @@ class ReactorModelAdmin(admin.ModelAdmin):
         num=obj.positions.count()
         return num
     get_fuel_assembly_num.short_description='fuel assembly count'
-        
-admin.site.register(ReactorModel,ReactorModelAdmin)
     
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('model','generation','reactor_type','geometry_type','row_symbol','column_symbol',
+                    'num_loops','num_control_rod_mechanisms','core_equivalent_diameter','active_height','cold_state_assembly_pitch','hot_state_assembly_pitch','vendor','thermal_couple_position','incore_instrument_position')
+        return ()
+      
+admin.site.register(ReactorModel,ReactorModelAdmin)
+
+class UnitParameterAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    def get_readonly_fields(self,request, obj=None):
+        if not request.user.is_superuser:
+            return ('plant','unit','reactor_model','electric_power','thermal_power','heat_fraction_in_fuel','primary_system_pressure',
+                    'ave_linear_power_density','ave_vol_power_density','ave_mass_power_density','best_estimated_cool_vol_flow_rate','bypass_flow_fraction',
+                    'cold_state_cool_temp','HZP_cool_inlet_temp','HFP_cool_inlet_temp','HFP_core_ave_cool_temp','mid_power_cool_inlet_temp',)
+        return ()
+admin.site.register(UnitParameter, UnitParameterAdmin)
+
+#plant operation information
+class FuelAssemblyLoadingPatternInline(admin.TabularInline):
+    exclude=('remark',)
+    model=FuelAssemblyLoadingPattern
+    def get_extra(self, request, obj=None, **kwargs):
+        extra =121
+        if obj:
+            extra -= obj.fuel_assembly_positions.count()
+        return extra
+    
+class CycleAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[FuelAssemblyLoadingPatternInline,]
+admin.site.register(Cycle, CycleAdmin)
+
+#fuel assembly information
+class GridInline(admin.TabularInline):
+    model=Grid
+    exclude=('remark',)
+
+class GuidTubeInline(admin.TabularInline):
+    model=GuidTube
+    exclude=('remark',)
+    
+class GridPositionInline(admin.TabularInline):
+    model=GridPosition
+    exclude=('remark',)
+
+class GuideTubeMapInline(admin.TabularInline):
+    model = FuelAssemblyModel.guid_tube_map.through
+    verbose_name='guide tube map'
+    verbose_name_plural='guide tube map'
+    
+class FuelAssemblyModelAdmin(admin.ModelAdmin):
+    exclude=('remark','guid_tube_map')
+    inlines=[GridInline,GuidTubeInline,GridPositionInline,GuideTubeMapInline,]
+admin.site.register(FuelAssemblyModel, FuelAssemblyModelAdmin)
+
+class FuelAssemblyRepositoryAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(FuelAssemblyRepository, FuelAssemblyRepositoryAdmin)
+
+
+    
+
 

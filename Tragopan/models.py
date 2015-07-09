@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from _mysql import NULL
+
 # Create your models here.
 
 
@@ -176,16 +176,9 @@ class ReactorModel(BaseModel):
     active_height= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     cold_state_assembly_pitch= models.DecimalField(max_digits=7, decimal_places=4,validators=[MinValueValidator(0)],help_text='unit:cm')
     hot_state_assembly_pitch = models.DecimalField(max_digits=7, decimal_places=4,validators=[MinValueValidator(0)],help_text='unit:cm')
-    vendor = models.ForeignKey(Vendor)
-    
-    def limit_thermal_couple_position_choices(self):
-        return {'reactor_model': self.model}
-    
-    def limit_incore_instrument_position_choices(self):
-        return {'reactor_model': self.model}
-    
-    thermal_couple_position=models.ManyToManyField('ReactorPosition',related_name='thermal_couple_position',db_table='thermal_couple_map',blank=True,limit_choices_to=limit_thermal_couple_position_choices)
-    incore_instrument_position=models.ManyToManyField('ReactorPosition',related_name='incore_instrument_position',db_table='incore_instrument_map',blank=True,limit_choices_to=limit_incore_instrument_position_choices)
+    vendor = models.ForeignKey(Vendor)  
+    thermal_couple_position=models.ManyToManyField('ReactorPosition',related_name='thermal_couple_position',db_table='thermal_couple_map',blank=True,)
+    incore_instrument_position=models.ManyToManyField('ReactorPosition',related_name='incore_instrument_position',db_table='incore_instrument_map',blank=True,)
    
     class Meta:
         db_table = 'reactor_model'
@@ -397,7 +390,6 @@ class FuelAssemblyLoadingPattern(BaseModel):
     reactor_position=models.ForeignKey(ReactorPosition)
     fuel_assembly=models.ForeignKey('FuelAssemblyRepository')
     rotation_degree=models.CharField(max_length=3,choices=ROTATION_DEGREE_CHOICES,default='0')
-    cycle_burnup=models.DecimalField(max_digits=15, decimal_places=5,validators=[MinValueValidator(0)],help_text='MWd/tU',blank=True,null=True)
     
     class Meta:
         db_table='fuel_assembly_loading_pattern'
@@ -423,8 +415,6 @@ class FuelAssemblyModel(BaseModel):
     pin_pitch=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     lower_gap=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
     upper_gap=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
-    guid_tube_map=models.ManyToManyField('FuelAssemblyPosition',related_name='guid_tube_map',db_table='guid_tube_map')
-    grid_position=models.ManyToManyField('Grid',through='GridPosition',related_name='grid_position')
     licensed_max_discharge_BU =models.DecimalField(max_digits=15, decimal_places=5,validators=[MinValueValidator(0)],help_text='MWd/tU',blank=True,null=True)
     licensed_pin_discharge_BU =models.DecimalField(max_digits=15, decimal_places=5,validators=[MinValueValidator(0)],help_text='MWd/tU',blank=True,null=True)
     vendor=models.ForeignKey(Vendor)
@@ -443,7 +433,6 @@ class FuelAssemblyRepository(BaseModel):
     arrival_date=models.DateField(help_text='Please use <b>YYYY-MM-DD<b> to input the date')
     plant=models.ForeignKey(Plant)
     vendor=models.ForeignKey(Vendor)
-    availability=models.NullBooleanField(default='True',verbose_name='available now?')
     
     class Meta:
         db_table='fuel_assembly_repository'
@@ -452,7 +441,7 @@ class FuelAssemblyRepository(BaseModel):
         return self.PN
     
     
-    
+#the position information of fuel assembly     
 class FuelAssemblyPosition(BaseModel):
     fuel_assembly_model=models.ForeignKey(FuelAssemblyModel,related_name='positions',related_query_name='position')
     row=models.PositiveSmallIntegerField()
@@ -465,12 +454,51 @@ class FuelAssemblyPosition(BaseModel):
     def __str__(self):
         return '{} R{}C{}'.format(self.fuel_assembly_model, self.row,self.column)
 
+class FuelElementMap(BaseModel):
+    fuel_assembly_position=models.OneToOneField(FuelAssemblyPosition)
+    fuel_element_type=models.ForeignKey('FuelElementType')
+    
+    class Meta:
+        db_table='fuel_element_map'
+        
+    def __str__(self):
+        return '{} {}'.format(self.fuel_assembly_position, self.fuel_element_type)
+
+class GuidTubeMap(BaseModel):
+    fuel_assembly_position=models.OneToOneField(FuelAssemblyPosition)
+    guid_tube=models.ForeignKey('GuidTube')
+    
+    class Meta:
+        db_table='guid_tube_map'
+    def __str__(self):
+        return '{} {}'.format(self.fuel_assembly_position, self.guid_tube)
+    
+class InstrumentTubePosition(BaseModel):
+    fuel_assembly_position=models.OneToOneField(FuelAssemblyPosition)
+    guid_tube=models.ForeignKey('InstrumentTube')
+    
+    class Meta:
+        db_table='instrument_tube_position'
+    def __str__(self):
+        return '{} {}'.format(self.fuel_assembly_position, self.guid_tube)
+
+class GridPosition(BaseModel):
+    fuel_assembly_model=models.ForeignKey(FuelAssemblyModel)
+    grid=models.ForeignKey('Grid')
+    height= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm') 
+    
+    class Meta:
+        db_table='grid_position'
+        
+    def __str__(self):
+        return '{} {}'.format(self.fuel_assembly_model, self.grid)    
+
+#the component of fuel assembly
 class Grid(BaseModel):
     FUCTIONALITY_CHOICS=(
                 ('blend','blend'),
                 ('fix','fix'),
     )
-    fuel_assembly_model=models.ForeignKey(FuelAssemblyModel)
     model=models.CharField(max_length=40)
     sleeve_material=models.ForeignKey(Material,related_name='grid_sleeves',related_query_name='grid_sleeve')
     sleeve_weight=models.DecimalField(max_digits=15, decimal_places=5,validators=[MinValueValidator(0)],help_text='g')
@@ -487,21 +515,12 @@ class Grid(BaseModel):
     def __str__(self):
         return self.model
 
-class GridPosition(BaseModel):
-    fuel_assembly_model=models.ForeignKey(FuelAssemblyModel)
-    grid=models.ForeignKey(Grid)
-    height= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm') 
-    
-    class Meta:
-        db_table='grid_position'
-        
-    def __str__(self):
-        return '{} {}'.format(self.fuel_assembly_model, self.grid)   
-
+  
 class GuidTube(BaseModel):
-    fuel_assembly_model=models.ForeignKey(FuelAssemblyModel)
-    outer_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
-    inner_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    upper_outer_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    upper_inner_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    buffer_outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm',null=True)
+    buffer_inner_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm',null=True)
     material=models.ForeignKey(Material)
     vendor=models.ForeignKey(Vendor)
     
@@ -509,4 +528,398 @@ class GuidTube(BaseModel):
         db_table='guid_tube'
         
     def __str__(self):
-        return "{}'s guid tube".format(self.fuel_assembly_model)
+        return "{} guid tube".format(self.material)
+    
+class InstrumentTube(BaseModel):
+    outer_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='instrument_tube'
+        
+    def __str__(self):
+        return "{}'s instrument tube".format(self.material)
+    
+class UpperNozzle(BaseModel):
+    fuel_assembly_model=models.OneToOneField(FuelAssemblyModel)
+    pitch=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    plate_thickness=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    plate_porosity=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text=r"unit:%")
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='upper_nozzle'
+        
+    def __str__(self):
+        return "{}'s upper nozzle".format(self.fuel_assembly_model)
+    
+class LowerNozzle(BaseModel):
+    fuel_assembly_model=models.OneToOneField(FuelAssemblyModel)
+    pitch=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    plate_thickness=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    plate_porosity=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text=r"unit:%")
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='lower_nozzle'
+        
+    def __str__(self):
+        return "{}'s lower nozzle".format(self.fuel_assembly_model)
+    
+#################################################
+#fuel element information 
+################################################# 
+
+class FuelElementType(BaseModel):
+    overall_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    active_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    plenum_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    filling_gas_pressure=models.DecimalField(max_digits=10, decimal_places=5,validators=[MinValueValidator(0)],help_text='unit:MPa')
+    filling_gas_materia=models.ForeignKey(Material)
+    fuel_pellet=models.ManyToManyField('FuelPelletType',through='FuelElementPelletLoadingScheme')
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='fuel_element_type'
+        
+    def __str__(self):
+        return "{} fuel element".format(self.overall_length)
+
+class UpperCap(BaseModel):
+    fuel_element_type=models.OneToOneField(FuelElementType)
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='upper_cap'
+        
+    def __str__(self):
+        return "{}'s upper cap".format(self.fuel_element_type)
+    
+
+class LowerCap(BaseModel):
+    fuel_element_type=models.OneToOneField(FuelElementType)
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='lower_cap'
+        
+    def __str__(self):
+        return "{}'s lower cap".format(self.fuel_element_type)
+    
+class PlenumSpring(BaseModel):
+    fuel_element_type=models.OneToOneField(FuelElementType)
+    weight=models.DecimalField(max_digits=10, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:g')
+    outer_diameter= models.DecimalField(max_digits=7, decimal_places=5,validators=[MinValueValidator(0)],help_text='unit:cm')
+    wire_diameter=models.DecimalField(max_digits=7, decimal_places=5,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='plenum_spring'
+        
+    def __str__(self):
+        return "{}'s plenum spring".format(self.fuel_element_type)
+    
+class CladdingTube(BaseModel):
+    fuel_element_type=models.OneToOneField(FuelElementType)
+    outer_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter= models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    roughness= models.DecimalField(max_digits=7, decimal_places=6,validators=[MinValueValidator(0)],help_text='unit:cm',blank=True,null=True)
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='cladding_tube'
+        
+    def __str__(self):
+        return "{}'s cladding tube".format(self.fuel_element_type)
+    
+
+#fake fuel element information 
+class FakeFuelElementType(BaseModel):
+    overall_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    pellet_outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    pellet_height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    vendor=models.ForeignKey(Vendor)
+    
+    class Meta:
+        db_table='fake_fuel_element_type'
+        
+    def __str__(self):
+        return '{} fake fuel element'.format(self.material)
+    
+
+
+#Fuel Pellet Type
+class FuelPelletType(BaseModel):
+    outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    inner_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],blank=True,null=True,help_text='unit:cm can be none when hollow')
+    height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    dish_volume_percentage=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text=r"unit:%")
+    dish_height=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    dish_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    roughness=models.DecimalField(max_digits=7, decimal_places=6,validators=[MinValueValidator(0)],help_text='unit:cm',blank=True,null=True)
+    density_percentage=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text=r"unit:%")
+    uncertainty_percentage=models.DecimalField(max_digits=9, decimal_places=6,validators=[MaxValueValidator(100),MinValueValidator(0)],help_text=r"unit:%")
+    material=models.ForeignKey(Material,related_name='fuel_pellet_material')
+    coating_thickness=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    coating_material=models.ForeignKey(Material,related_name='fuel_pellet_coating')
+    
+    class Meta:
+        db_table='fuel_pellet_type'
+        
+    def __str__(self):
+        return '{} fuel pellet'.format(self.material)
+    
+class FuelElementPelletLoadingScheme(BaseModel):
+    fuel_element_type=models.ForeignKey(FuelElementType)
+    fuel_pellet_type=models.ForeignKey(FuelPelletType)
+    order=models.PositiveSmallIntegerField()
+    
+    class Meta:
+        db_table='fuel_element_pellet_loading_scheme'
+        
+    def __str__(self):
+        return '{} {} {}'.format(self.fuel_element_type, self.order,self.pellet)
+    
+
+    
+#################################################
+#component assembly information 
+#################################################    
+
+####################################################################################################################################
+#the following five models describe all the component rod type
+class ControlRodType(BaseModel):
+    absorb_material=models.ForeignKey(Material,related_name='control_rod_absorb')
+    absorb_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    absorb_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    cladding_material=models.ForeignKey(Material,related_name='control_rod_cladding')
+    cladding_inner_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    cladding_outer_diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    
+    class Meta:
+        db_table='control_rod_type'
+        
+    def __str__(self):
+        return '{} control rod'.format(self.absorb_material)
+    
+class SourceRodType(BaseModel):
+    TYPE_CHOICES=(
+                  ('primary','primary'),
+                  ('secondary','secondary')
+    )
+    type=models.CharField(max_length=9,choices=TYPE_CHOICES)
+    overall_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    strength=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)])
+    
+    class Meta:
+        db_table='source_rod_type'
+    
+    def __str__(self):
+        return '{} source rod:{}'.format(self.type, self.material)
+
+class NozzlePlugRod(BaseModel):
+    length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    diameter=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    material=models.ForeignKey(Material)
+    
+    class Meta:
+        db_table='nozzle_plug_rod'
+    
+    def __str__(self):
+        return '{} nozzle plug rod'.format(self.material)
+    
+class BurnablePoisonRod(BaseModel):
+    length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    radial_map=models.ManyToManyField(Material,through='BurnablePoisonMaterial',related_name='burnable_poison_rod')
+    
+    class Meta:
+        db_table='burnable_poison_rod'
+    
+    def __str__(self):
+        return '{} burnable poison rod'.format(self.material)
+    
+    
+class BurnablePoisonMaterial(BaseModel):
+    burnable_poison_rod=models.ForeignKey(BurnablePoisonRod)
+    material=models.ForeignKey(Material)
+    radius=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    
+    class Meta:
+        db_table='burnable_poison_rod_material'
+        
+    def __str__(self):
+        return '{} {}'.format(self.burnable_poison_rod,self.material)
+######################################################################################################################
+    
+    
+
+############################################################################
+#the following three tables combine to describe burnable poison assembly   
+class BurnablePoisonAssembly(BaseModel):
+    burnable_poison_map=models.ManyToManyField(GuidTubeMap,through='BurnablePoisonRodMap',related_name='bp_burnable_poison')
+    nozzle_plug_rod_map=models.ManyToManyField(GuidTubeMap,through='BurnablePoisonAssemblyNozzlePlug',related_name='bp_nozzle_plug')
+    
+    class Meta:
+        db_table='burnable_poison_assembly'
+        
+    def __str__(self):
+        return 'burnable poison assembly'
+    
+    
+class BurnablePoisonRodMap(BaseModel):
+    burnable_poison_assembly=models.ForeignKey(BurnablePoisonAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    burnable_poison_rod=models.ForeignKey(BurnablePoisonRod)
+    
+    class Meta:
+        db_table='burnable_poison_rod_map'
+        
+    def __str__(self):
+        return '{} {}'.format(self.burnable_poison_assembly,self.burnable_poison_rod)
+    
+class BurnablePoisonAssemblyNozzlePlug(BaseModel):
+    burnable_poison_assembly=models.ForeignKey(BurnablePoisonAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    nozzle_plug_rod=models.ForeignKey(NozzlePlugRod)
+    
+    class Meta:
+        db_table='burnable_poison_assembly_nozzle_plug'
+        
+    def __str__(self):
+        return '{} {}'.format(self.burnable_poison_assembly,self.nozzle_plug_rod)  
+    
+    
+    
+###############################################################################
+#the following two models describe control rod assembly
+class ControlRodAssembly(BaseModel):
+    overall_length=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:cm')
+    control_rod_map=models.ManyToManyField(GuidTubeMap,through='ControlRodMap')
+    
+    class Meta:
+        db_table='control_rod_assembly'
+        
+    def __str__(self):
+        return 'control rod assmebly {}'.format(self.guid_tube_position)
+    
+class ControlRodMap(BaseModel):
+    control_rod_assembly=models.ForeignKey(ControlRodAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    control_rod_type=models.ForeignKey(ControlRodType)
+    
+    class Meta:
+        db_table='control_rod_map'
+        
+    def __str__(self):
+        return '{} {}'.format(self.control_rod_assembly,self.control_rod_type)
+    
+    
+    
+
+##############################################################################
+#the following four models combine to describe source assembly 
+class SourceAssembly(BaseModel):
+    source_rod_map=models.ManyToManyField(GuidTubeMap,through='SourceRodMap',related_name='source_rod')
+    burnable_poison_map=models.ManyToManyField(GuidTubeMap,through='SourceAssemblyBPRod',related_name='source_burnable_poison')
+    nozzle_plug_rod_map=models.ManyToManyField(GuidTubeMap,through='SourceAssemblyNozzlePlug',related_name='source_nozzle_plug')
+    
+    class Meta:
+        db_table='source_assembly'
+        
+    def __str__(self):
+        return 'Source Assembly'
+    
+class SourceRodMap(BaseModel):
+    source_assembly=models.ForeignKey(SourceAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    source_rod=models.ForeignKey(SourceRodType)
+    
+    class Meta:
+        db_table='source_rod_map'
+    
+    def __str__(self):
+        return '{} {}'.format(self.source_assembly, self.guid_tube_position)
+
+class SourceAssemblyBPRod(BaseModel):
+    source_assembly=models.ForeignKey(SourceAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    burnable_poison_rod=models.ForeignKey(BurnablePoisonRod)
+   
+    
+    class Meta:
+        db_table='source_bp_rod'
+    
+    def __str__(self):
+        return '{} {}'.format(self.source_assembly, self.guid_tube_position)
+    
+class SourceAssemblyNozzlePlug(BaseModel):
+    source_assembly=models.ForeignKey(SourceAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    nozzle_plug_rod=models.ForeignKey(NozzlePlugRod)
+    
+    class Meta:
+        db_table='source_assembly_nozzle_plug'
+    
+    def __str__(self):
+        return '{} {}'.format(self.source_assembly, self.guid_tube_position)
+    
+    
+    
+################################################################################ 
+#the following 2 models describe nozzle plug assembly
+
+class NozzlePlugAssembly(BaseModel):
+    weight=models.DecimalField(max_digits=7, decimal_places=3,validators=[MinValueValidator(0)],help_text='unit:Kg')
+    nozzle_plug_rod=models.ManyToManyField(NozzlePlugRod,through='NozzlePlugRodMap')
+    
+    class Meta:
+        db_table='nozzle_plug_assembly'
+    
+    def __str__(self):
+        return '{}'.format(self.weight) 
+
+class NozzlePlugRodMap(BaseModel):
+    nozzle_plug_assembly=models.ForeignKey(NozzlePlugAssembly)
+    guid_tube_position=models.OneToOneField(GuidTubeMap)
+    nozzle_plug_rod=models.ForeignKey(NozzlePlugRod)
+    
+    class Meta:
+        db_table='nozzle_plug_rod_map'
+        
+    def __str__(self):
+        return '{} {}'.format(self.nozzle_plug_assembly, self.nozzle_plug_rod)
+    
+    
+#################################################################################
+
+
+        
+
+        
+    
+
+    
+    
+    
+    

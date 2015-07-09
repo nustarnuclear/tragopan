@@ -78,7 +78,7 @@ WSGI_APPLICATION = 'orient.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'tragopan',
+        'NAME': 'orient',
         'USER': 'test',
         'PASSWORD': 'nustartest',
         'HOST': 'localhost',

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import *
 from django.db.models import Sum,F,Count
-from _ast import Num
+
 # Register your models here.
 
 #################################################
@@ -303,34 +303,173 @@ class CycleAdmin(admin.ModelAdmin):
     inlines=[FuelAssemblyLoadingPatternInline,]
 admin.site.register(Cycle, CycleAdmin)
 
-#fuel assembly information
-class GridInline(admin.TabularInline):
-    model=Grid
-    exclude=('remark',)
 
-class GuidTubeInline(admin.TabularInline):
-    model=GuidTube
+#fuel assembly information
+class GridAdmin(admin.ModelAdmin):
     exclude=('remark',)
+admin.site.register(Grid, GridAdmin)
+
+class GuidTubeAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(GuidTube, GuidTubeAdmin)
+
+class InstrumentTubeAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(InstrumentTube, InstrumentTubeAdmin)
+
+
     
 class GridPositionInline(admin.TabularInline):
-    model=GridPosition
     exclude=('remark',)
+    model=GridPosition
 
-class GuideTubeMapInline(admin.TabularInline):
-    model = FuelAssemblyModel.guid_tube_map.through
-    verbose_name='guide tube map'
-    verbose_name_plural='guide tube map'
+class UpperNozzleInline(admin.TabularInline):
+    exclude=('remark',)
+    model=UpperNozzle
     
+class LowerNozzleInline(admin.TabularInline):
+    exclude=('remark',)
+    model=LowerNozzle
+        
 class FuelAssemblyModelAdmin(admin.ModelAdmin):
-    exclude=('remark','guid_tube_map')
-    inlines=[GridInline,GuidTubeInline,GridPositionInline,GuideTubeMapInline,]
+    exclude=('remark',)
+    inlines=[GridPositionInline,UpperNozzleInline,LowerNozzleInline,]
 admin.site.register(FuelAssemblyModel, FuelAssemblyModelAdmin)
 
-class FuelAssemblyRepositoryAdmin(admin.ModelAdmin):
+
+#the position information of fuel assembly model
+class FuelElementMapInline(admin.TabularInline):
     exclude=('remark',)
-admin.site.register(FuelAssemblyRepository, FuelAssemblyRepositoryAdmin)
-
-
+    model=FuelElementMap
     
+class GuidTubeMapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=GuidTubeMap
+    
+class InstrumentTubePositionInline(admin.TabularInline):
+    exclude=('remark',)
+    model=InstrumentTubePosition
+    
+class FuelAssemblyPositionAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[FuelElementMapInline,GuidTubeMapInline,InstrumentTubePositionInline]
+admin.site.register(FuelAssemblyPosition, FuelAssemblyPositionAdmin)
 
+#fuel element information
+class UpperCapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=UpperCap
+    
+class LowerCapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=LowerCap
+    
+class PlenumSpringInline(admin.TabularInline):
+    exclude=('remark',)
+    model=PlenumSpring
+    
+class CladdingTubeInline(admin.TabularInline):
+    exclude=('remark',)
+    model=CladdingTube
+
+class FuelElementPelletLoadingSchemeInline(admin.TabularInline):
+    exclude=('remark',)
+    model=FuelElementPelletLoadingScheme 
+    
+class FuelElementTypeAdmin(admin.ModelAdmin):
+    exclude=('remark',) 
+    inlines=[UpperCapInline,LowerCapInline,PlenumSpringInline,CladdingTubeInline,FuelElementPelletLoadingSchemeInline]
+admin.site.register(FuelElementType, FuelElementTypeAdmin)
+
+#fuel pellet type information    
+class FuelPelletTypeAdmin(admin.ModelAdmin):
+    exclude=('remark',) 
+admin.site.register(FuelPelletType, FuelPelletTypeAdmin)
+
+class FakeFuelElementTypeAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(FakeFuelElementType, FakeFuelElementTypeAdmin)
+
+#########################################################################################
+#component assembly rod
+
+class ControlRodTypeAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(ControlRodType, ControlRodTypeAdmin)
+
+class SourceRodTypeAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(SourceRodType, SourceRodTypeAdmin) 
+
+class NozzlePlugRodAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+admin.site.register(NozzlePlugRod, NozzlePlugRodAdmin)
+
+class BurnablePoisonMaterialInline(admin.TabularInline):
+    model=BurnablePoisonMaterial
+    exclude=('remark',) 
+    
+class BurnablePoisonRodAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[BurnablePoisonMaterialInline,]
+admin.site.register(BurnablePoisonRod, BurnablePoisonRodAdmin) 
+
+############################################################################
+#burnable poison assembly
+
+class BurnablePoisonRodMapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=BurnablePoisonRodMap
+    
+class BurnablePoisonAssemblyNozzlePlugInline(admin.TabularInline):
+    exclude=('remark',)
+    model=BurnablePoisonAssemblyNozzlePlug  
+    
+    
+class BurnablePoisonAssemblyAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[BurnablePoisonRodMapInline,BurnablePoisonAssemblyNozzlePlugInline]
+admin.site.register(BurnablePoisonAssembly, BurnablePoisonAssemblyAdmin)
+
+###############################################################################
+#control rod assembly   
+
+class ControlRodMapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=ControlRodMap
+
+class ControlRodAssemblyAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[ControlRodMapInline,]
+admin.site.register(ControlRodAssembly, ControlRodAssemblyAdmin)
+
+##############################################################################
+#source assembly 
+class SourceRodMapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=SourceRodMap
+
+class SourceAssemblyBPRodInline(admin.TabularInline):
+    exclude=('remark',)
+    model=SourceAssemblyBPRod
+    
+class SourceAssemblyNozzlePlugInline(admin.TabularInline):
+    exclude=('remark',)
+    model=SourceAssemblyNozzlePlug
+    
+class SourceAssemblyAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[SourceRodMapInline,SourceAssemblyBPRodInline,SourceAssemblyNozzlePlugInline]
+admin.site.register(SourceAssembly, SourceAssemblyAdmin)
+
+################################################################################ 
+#nozzle plug assembly
+class NozzlePlugRodMapInline(admin.TabularInline):
+    exclude=('remark',)
+    model=NozzlePlugRodMap
+
+class NozzlePlugAssemblyAdmin(admin.ModelAdmin):
+    exclude=('remark',)
+    inlines=[NozzlePlugRodMapInline,]
+admin.site.register(NozzlePlugAssembly, NozzlePlugAssemblyAdmin)
 
